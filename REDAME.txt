@@ -1,0 +1,3 @@
+Apos instalar baixar o chromedriver, talvez seja necessario dar permissã0:
+sudo xattr -d com.apple.quarantine ./chromedriver
+
