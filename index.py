@@ -1,115 +1,151 @@
+import pymysql
+import json
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.keys import Keys
-from webdriver_manager.chrome import ChromeDriverManager
 import time
-import json
+from webdriver_manager.chrome import ChromeDriverManager
 
-chrome_options = Options()
-# Remover a linha abaixo para que o Chrome não seja executado em modo headless
-# chrome_options.add_argument("--headless")
-chrome_options.add_argument("--no-sandbox")
-chrome_options.add_argument("--disable-dev-shm-usage")
-chrome_options.add_argument("--disable-gpu")
-chrome_options.add_argument("--remote-debugging-port=9222")
+# Configurações do Selenium e ChromeDriver usando webdriver-manager
+options = Options()
+# options.add_argument('--headless')  # Executar sem interface gráfica, opcional
+options.add_argument('--no-sandbox')
+options.add_argument('--disable-dev-shm-usage')
 
-# Configurar o ChromeDriver automaticamente com webdriver-manager
-driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+# Inicializar o driver do Chrome
+driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
-# Acesse a página de login
-driver.get('https://pt.surebet.com/users/sign_in')
+# Conectar ao banco de dados MySQL
+conn = pymysql.connect(
+    host='localhost',       # Seu host MySQL
+    user='root',            # Seu usuário MySQL
+    password='',            # Sua senha MySQL
+    database='apiarb'       # Nome do banco de dados
+)
 
-# Aguarde a página carregar
-time.sleep(2)
+cursor = conn.cursor()
 
-# Preencha o formulário de login
-email_field = driver.find_element(By.ID, 'user_email')
-password_field = driver.find_element(By.ID, 'user_password')
+# Lista para armazenar os dados para o JSON
+data_list = []
 
-email_field.send_keys('assmdx@gmail.com')
-password_field.send_keys('32412426Aa')
-
-# Submeta o formulário
-password_field.send_keys(Keys.RETURN)
-
-# Aguarde o login ser processado
-time.sleep(5)
-
-# Acesse a página das surebets
-driver.get('https://pt.surebet.com/surebets')
-
-# Aguarde a página carregar completamente
-time.sleep(5)
-
-# Localize a tabela com id 'surebets-table'
-surebets_table = driver.find_element(By.ID, 'surebets-table')
-
-# Estrutura para armazenar os dados dos eventos
-events = []
-
-# Iterar pelos tbody elementos para coletar os dados
-tbody_elements = surebets_table.find_elements(By.TAG_NAME, 'tbody')
-
-for tbody in tbody_elements:
-    event_data = {}
-    
+def format_datetime(datetime_str):
+    """Formata a string de data e hora removendo a quebra de linha e ajustando para o formato esperado."""
     try:
-        lucro = tbody.find_element(By.CLASS_NAME, 'profit').text
-        event = tbody.find_element(By.CLASS_NAME, 'event').text
-        quando = tbody.find_element(By.CLASS_NAME, 'time').text
-        esporte = tbody.find_element(By.CLASS_NAME, 'minor').text
-
-        # Dados da primeira casa de apostas (primeira linha)
-        first_row = tbody.find_elements(By.TAG_NAME, 'tr')[0]
-        casa01 = first_row.find_element(By.CLASS_NAME, 'booker').text
-        link01 = first_row.find_element(By.CLASS_NAME, 'value_link').get_attribute('href')
-        mercado01 = first_row.find_element(By.CLASS_NAME, 'coeff').text
-        descricao01 = first_row.find_element(By.TAG_NAME, 'abbr').get_attribute('data-bs-original-title')
-        minorc01 = first_row.find_element(By.CLASS_NAME, 'minorc').text
-        odd01 = first_row.find_element(By.CLASS_NAME, 'value').text
-
-        # Dados da segunda casa de apostas (segunda linha)
-        second_row = tbody.find_elements(By.TAG_NAME, 'tr')[1]
-        casa02 = second_row.find_element(By.CLASS_NAME, 'booker').text
-        link02 = second_row.find_element(By.CLASS_NAME, 'value_link').get_attribute('href')
-        mercado02 = second_row.find_element(By.CLASS_NAME, 'coeff').text
-        descricao02 = second_row.find_element(By.TAG_NAME, 'abbr').get_attribute('data-bs-original-title')
-        minorc02 = second_row.find_element(By.CLASS_NAME, 'minorc').text
-        odd02 = second_row.find_element(By.CLASS_NAME, 'value').text
-
-        # Adicionar os dados coletados ao dicionário do evento
-        event_data = {
-            'Lucro': lucro,
-            'Evento': event,
-            'Quando': quando,
-            'Esporte': esporte,
-            'Casa01': casa01,
-            'Link01': link01,
-            'Mercado01': mercado01,
-            'Descricao01': descricao01,
-            'minorc01': minorc01,
-            'Odd01': odd01,
-            'Casa02': casa02,
-            'Link02': link02,
-            'Mercado02': mercado02,
-            'Descricao02': descricao02,
-            'minorc02': minorc02,
-            'Odd02': odd02,
-        }
-        
-        events.append(event_data)
-    
+        # Remover a quebra de linha
+        date_time = datetime_str.replace("\n", " ")
+        # Converter para o formato esperado pelo MySQL
+        formatted_date_time = time.strptime(date_time, "%d/%m %H:%M")
+        return time.strftime("%Y-%m-%d %H:%M:%S", formatted_date_time)
     except Exception as e:
-        print(f"Erro ao processar tbody: {e}")
+        print(f"Erro ao formatar data/hora: {e}")
+        return None
 
-# Converter os dados dos eventos em JSON
-events_json = json.dumps(events, ensure_ascii=False, indent=4)
+try:
+    # Acesse a página de login
+    driver.get("https://pt.surebet.com/users/sign_in")
 
-# Salvar o JSON em um arquivo na raiz do projeto
-with open("surebets_data.json", "w", encoding="utf-8") as json_file:
-    json_file.write(events_json)
+    # Aguarde o carregamento da página de login
+    time.sleep(3)
 
-# Feche o navegador
-driver.quit()
+    # Preencha os campos de login
+    driver.find_element(By.ID, "user_email").send_keys("assmdx@gmail.com")  # Atualize com seu email
+    driver.find_element(By.ID, "user_password").send_keys("32412426Aa")  # Atualize com sua senha
+
+    # Clique no botão de login
+    driver.find_element(By.NAME, "commit").click()
+
+    # Aguarde o login ser processado e a próxima página carregar
+    time.sleep(5)
+
+    # Verifique se o login foi bem-sucedido e, em seguida, navegue para a página das Surebets
+    driver.get("https://pt.surebet.com/surebets")
+
+    # Aguarde a página de surebets carregar
+    time.sleep(5)
+
+    # Localize a tabela com id 'surebets-table'
+    surebets_table = driver.find_element(By.ID, 'surebets-table')
+
+    # Estrutura para armazenar os dados dos eventos
+    events = []
+
+    # Iterar pelos tbody elementos para coletar os dados
+    tbody_elements = surebets_table.find_elements(By.TAG_NAME, 'tbody')
+
+    for tbody in tbody_elements:
+        event_data = {}
+        
+        try:
+            lucro = tbody.find_element(By.CLASS_NAME, 'profit').text if tbody.find_elements(By.CLASS_NAME, 'profit') else None
+            evento = tbody.find_element(By.CLASS_NAME, 'event').text if tbody.find_elements(By.CLASS_NAME, 'event') else None
+            quando_raw = tbody.find_element(By.CLASS_NAME, 'time').text if tbody.find_elements(By.CLASS_NAME, 'time') else None
+            esporte = tbody.find_element(By.CLASS_NAME, 'minor').text if tbody.find_elements(By.CLASS_NAME, 'minor') else None
+
+            # Formatar data/hora
+            quando = format_datetime(quando_raw)
+
+            # Dados da primeira casa de apostas (primeira linha)
+            first_row = tbody.find_elements(By.TAG_NAME, 'tr')[0] if tbody.find_elements(By.TAG_NAME, 'tr') else None
+            casa01 = first_row.find_element(By.CLASS_NAME, 'booker').text if first_row and first_row.find_elements(By.CLASS_NAME, 'booker') else None
+            link01 = first_row.find_element(By.CLASS_NAME, 'value_link').get_attribute('href') if first_row and first_row.find_elements(By.CLASS_NAME, 'value_link') else None
+            mercado01 = first_row.find_element(By.CLASS_NAME, 'coeff').text if first_row and first_row.find_elements(By.CLASS_NAME, 'coeff') else None
+            descricao01 = first_row.find_element(By.TAG_NAME, 'abbr').get_attribute('data-bs-original-title') if first_row and first_row.find_elements(By.TAG_NAME, 'abbr') else None
+            minorc01 = first_row.find_element(By.CLASS_NAME, 'minorc').text if first_row and first_row.find_elements(By.CLASS_NAME, 'minorc') else None
+            odd01 = first_row.find_element(By.CLASS_NAME, 'value').text if first_row and first_row.find_elements(By.CLASS_NAME, 'value') else None
+
+            # Dados da segunda casa de apostas (segunda linha)
+            second_row = tbody.find_elements(By.TAG_NAME, 'tr')[1] if len(tbody.find_elements(By.TAG_NAME, 'tr')) > 1 else None
+            casa02 = second_row.find_element(By.CLASS_NAME, 'booker').text if second_row and second_row.find_elements(By.CLASS_NAME, 'booker') else None
+            link02 = second_row.find_element(By.CLASS_NAME, 'value_link').get_attribute('href') if second_row and second_row.find_elements(By.CLASS_NAME, 'value_link') else None
+            mercado02 = second_row.find_element(By.CLASS_NAME, 'coeff').text if second_row and second_row.find_elements(By.CLASS_NAME, 'coeff') else None
+            descricao02 = second_row.find_element(By.TAG_NAME, 'abbr').get_attribute('data-bs-original-title') if second_row and second_row.find_elements(By.TAG_NAME, 'abbr') else None
+            minorc02 = second_row.find_element(By.CLASS_NAME, 'minorc').text if second_row and second_row.find_elements(By.CLASS_NAME, 'minorc') else None
+            odd02 = second_row.find_element(By.CLASS_NAME, 'value').text if second_row and second_row.find_elements(By.CLASS_NAME, 'value') else None
+
+            # Criar um dicionário para armazenar os dados sem conversão
+            data = {
+                "lucro": lucro,
+                "evento": evento,
+                "quando": quando_raw,  # Armazena o valor original para o JSON
+                "esporte": esporte,
+                "casa01": casa01,
+                "link01": link01,
+                "mercado01": mercado01,
+                "descricao01": descricao01,
+                "minorc01": minorc01,
+                "odd01": odd01,
+                "casa02": casa02,
+                "link02": link02,
+                "mercado02": mercado02,
+                "descricao02": descricao02,
+                "minorc02": minorc02,
+                "odd02": odd02
+            }
+
+            # Adicionar os dados ao banco de dados com as conversões necessárias
+            lucro_float = float(lucro.replace("%", "").replace(",", ".")) if lucro else None
+            odd01_int = int(float(odd01.replace(",", ".")) * 100) if odd01 else None
+            odd02_int = int(float(odd02.replace(",", ".")) * 100) if odd02 else None
+
+            sql = """
+                INSERT INTO sures (lucro, evento, quando, esport, casa01, link01, mercado01, descricao01, minorc01, Odd01, casa02, link02, mercado02, descricao02, minorc02, Odd02)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(sql, (lucro_float, evento, quando, esporte, casa01, link01, mercado01, descricao01, minorc01, odd01_int, casa02, link02, mercado02, descricao02, minorc02, odd02_int))
+            conn.commit()
+
+            # Adicionar o dicionário à lista para o JSON
+            data_list.append(data)
+
+        except Exception as e:
+            print(f"Erro ao processar tbody: {e}")
+
+    # Escrever os dados em um arquivo JSON
+    with open("sures_data.json", "w") as json_file:
+        json.dump(data_list, json_file, indent=4)
+
+finally:
+    driver.quit()
+    cursor.close()
+    conn.close()
