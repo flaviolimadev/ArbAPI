@@ -103,40 +103,49 @@ try:
             minorc02 = second_row.find_element(By.CLASS_NAME, 'minorc').text if second_row and second_row.find_elements(By.CLASS_NAME, 'minorc') else None
             odd02 = second_row.find_element(By.CLASS_NAME, 'value').text if second_row and second_row.find_elements(By.CLASS_NAME, 'value') else None
 
-            # Criar um dicionário para armazenar os dados sem conversão
-            data = {
-                "lucro": lucro,
-                "evento": evento,
-                "quando": quando_raw,  # Armazena o valor original para o JSON
-                "esporte": esporte,
-                "casa01": casa01,
-                "link01": link01,
-                "mercado01": mercado01,
-                "descricao01": descricao01,
-                "minorc01": minorc01,
-                "odd01": odd01,
-                "casa02": casa02,
-                "link02": link02,
-                "mercado02": mercado02,
-                "descricao02": descricao02,
-                "minorc02": minorc02,
-                "odd02": odd02
-            }
-
-            # Adicionar os dados ao banco de dados com as conversões necessárias
-            lucro_float = float(lucro.replace("%", "").replace(",", ".")) if lucro else None
-            odd01_int = int(float(odd01.replace(",", ".")) * 100) if odd01 else None
-            odd02_int = int(float(odd02.replace(",", ".")) * 100) if odd02 else None
-
-            sql = """
-                INSERT INTO sures (lucro, evento, quando, esport, casa01, link01, mercado01, descricao01, minorc01, Odd01, casa02, link02, mercado02, descricao02, minorc02, Odd02)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            # Verifique se já existe um registro idêntico no banco de dados
+            check_sql = """
+                SELECT COUNT(*) FROM sures WHERE lucro = %s AND evento = %s AND quando = %s
+                AND esport = %s AND casa01 = %s AND mercado01 = %s AND descricao01 = %s AND odd01 = %s
+                AND casa02 = %s AND mercado02 = %s AND descricao02 = %s AND odd02 = %s
             """
-            cursor.execute(sql, (lucro_float, evento, quando, esporte, casa01, link01, mercado01, descricao01, minorc01, odd01_int, casa02, link02, mercado02, descricao02, minorc02, odd02_int))
-            conn.commit()
+            cursor.execute(check_sql, (lucro, evento, quando, esporte, casa01, mercado01, descricao01, odd01, casa02, mercado02, descricao02, odd02))
+            result = cursor.fetchone()
 
-            # Adicionar o dicionário à lista para o JSON
-            data_list.append(data)
+            if result[0] == 0:  # Se não existir, insira o novo registro
+                # Adicionar os dados ao banco de dados com as conversões necessárias
+                lucro_float = float(lucro.replace("%", "").replace(",", ".")) if lucro else None
+                odd01_int = int(float(odd01.replace(",", ".")) * 100) if odd01 else None
+                odd02_int = int(float(odd02.replace(",", ".")) * 100) if odd02 else None
+
+                sql = """
+                    INSERT INTO sures (lucro, evento, quando, esport, casa01, link01, mercado01, descricao01, minorc01, Odd01, casa02, link02, mercado02, descricao02, minorc02, Odd02)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                cursor.execute(sql, (lucro_float, evento, quando, esporte, casa01, link01, mercado01, descricao01, minorc01, odd01_int, casa02, link02, mercado02, descricao02, minorc02, odd02_int))
+                conn.commit()
+
+                # Adicionar o dicionário à lista para o JSON
+                data = {
+                    "lucro": lucro,
+                    "evento": evento,
+                    "quando": quando_raw,  # Armazena o valor original para o JSON
+                    "esporte": esporte,
+                    "casa01": casa01,
+                    "link01": link01,
+                    "mercado01": mercado01,
+                    "descricao01": descricao01,
+                    "minorc01": minorc01,
+                    "odd01": odd01,
+                    "casa02": casa02,
+                    "link02": link02,
+                    "mercado02": mercado02,
+                    "descricao02": descricao02,
+                    "minorc02": minorc02,
+                    "odd02": odd02
+                }
+
+                data_list.append(data)
 
         except Exception as e:
             print(f"Erro ao processar tbody: {e}")
